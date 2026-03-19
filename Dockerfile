@@ -41,7 +41,7 @@ token = open(secret_path).read().strip() if os.path.exists(secret_path) else Non
 print('Downloading model into image...', flush=True)
 hf_hub_download(
     repo_id='nickoo004/gemma3-4b-karakalpak-GGUF',
-    filename='gemma3-4b-karakalpak-Q4_K_M.gguf',
+    filename='gemma3-4b-karakalpak-q4_k_m.gguf',
     local_dir='/app/models',
     token=token,
 )

@@ -2,7 +2,8 @@ import runpod
 import os
 from llama_cpp import Llama
 
-MODEL_PATH = "/app/models/gemma3-4b-karakalpak-Q4_K_M.gguf"
+# Must match the filename used in the Dockerfile hf_hub_download call exactly
+MODEL_PATH = "/app/models/gemma3-4b-karakalpak-q4_k_m.gguf"
 llm = None
 
 
@@ -20,10 +21,12 @@ def load_model():
     print(f"Loading model from {MODEL_PATH} ...", flush=True)
     llm = Llama(
         model_path=MODEL_PATH,
-        n_gpu_layers=999,
-        n_ctx=8192,
+        n_gpu_layers=99,       # all layers on GPU (matches local entrypoint.sh)
+        n_ctx=32768,           # 32K context (matches local entrypoint.sh)
         n_batch=512,
+        n_ubatch=256,          # micro-batch size (matches local entrypoint.sh)
         n_threads=4,
+        flash_attn=True,       # required for large context; speeds up attention
         verbose=True,
         # chat_format=None: auto-detect from the GGUF embedded chat template.
         # This is the most correct approach for Gemma 3 and avoids hard-coding
