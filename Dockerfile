@@ -39,16 +39,3 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 CMD ["bash", "scripts/start.sh"]
-```
-
----
-
-## Step 7: `requirements.txt`
-```
-llama-cpp-python[cuda]>=0.2.90
-fastapi>=0.111.0
-uvicorn[standard]>=0.30.0
-pydantic>=2.0
-pydantic-settings>=2.0
-huggingface_hub>=0.23.0
-hf_transfer>=0.1.6
