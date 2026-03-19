@@ -1,4 +1,3 @@
-# src/handler.py
 import runpod
 import os
 import json
@@ -163,20 +162,3 @@ def handler(job):
 # ── Start ─────────────────────────────────────────────────────
 if __name__ == "__main__":
     runpod.serverless.start({"handler": handler})
-```
-
----
-
-### 4. `scripts/start.sh` — o'zgartirish shart emas, lekin soddalashtirish mumkin
-
-`CMD ["python", "-u", "src/handler.py"]` — Dockerfile da to'g'ridan belgilandi, `start.sh` shart emas.
-
----
-
-## RunPod da sozlash
-```
-Environment Variables:
-  HF_TOKEN = hf_your_token (Secret qilib saqlang!)
-
-Container Disk: 15GB
-GPU: RTX 3090 / 4090
