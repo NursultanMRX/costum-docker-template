@@ -1,1 +1,21 @@
+version: "3.8"
 
+services:
+  llm-server:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+      - N_GPU_LAYERS=999
+      - N_CTX=8192
+    volumes:
+      - ./models:/app/models   # model cache (qayta yuklamaslik uchun)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
