@@ -1,25 +1,9 @@
-FROM nvidia/cuda:12.1.0-cudnn8-devel-ubuntu22.04
+FROM runpod/base:0.6.2-cuda12.1.0
 
 ENV DEBIAN_FRONTEND=noninteractive
-
-RUN apt-get update && apt-get install -y \
-    python3.11 \
-    python3.11-dev \
-    python3-pip \
-    git \
-    curl \
-    cmake \
-    build-essential \
-    ninja-build \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN ln -s /usr/bin/python3.11 /usr/bin/python
-RUN pip install --upgrade pip setuptools wheel
+ENV HF_HUB_ENABLE_HF_TRANSFER=1
 
 WORKDIR /app
-
-ENV CMAKE_ARGS="-DGGML_CUDA=on"
-ENV FORCE_CMAKE=1
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -30,9 +14,4 @@ RUN chmod +x scripts/*.sh
 
 RUN mkdir -p /app/models
 
-EXPOSE 8000
-
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-CMD ["bash", "scripts/start.sh"]
+CMD ["python", "-u", "src/handler.py"]
