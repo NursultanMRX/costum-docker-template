@@ -1,10 +1,12 @@
 import runpod
 import os
+import sys
 from huggingface_hub import hf_hub_download
 from llama_cpp import Llama
 
 MODEL_PATH = "/app/models/gemma3-4b-karakalpak-Q4_K_M.gguf"
 llm = None
+
 
 def load_model():
     global llm
@@ -12,30 +14,34 @@ def load_model():
         return
 
     if not os.path.exists(MODEL_PATH):
-        print("⏳ Downloading model...")
+        print("Downloading model from HuggingFace...", flush=True)
         os.makedirs("/app/models", exist_ok=True)
+        hf_token = os.environ.get("HF_TOKEN")
+        if not hf_token:
+            print("WARNING: HF_TOKEN not set. Download may fail for private repos.", flush=True)
         hf_hub_download(
             repo_id="nickoo004/gemma3-4b-karakalpak-GGUF",
             filename="gemma3-4b-karakalpak-Q4_K_M.gguf",
             local_dir="/app/models",
-            token=os.environ["HF_TOKEN"],
+            token=hf_token,
         )
-        print("✅ Downloaded!")
+        print("Model downloaded!", flush=True)
 
-    print("⏳ Loading model...")
+    print("Loading model into GPU...", flush=True)
     llm = Llama(
         model_path=MODEL_PATH,
         n_gpu_layers=999,
         n_ctx=8192,
         n_batch=512,
-        verbose=True,       # ← True qiling, log ko'rish uchun
-        chat_format="gemma",
+        n_threads=4,
+        verbose=True,
+        chat_format="gemma3",
     )
-    print("✅ Model ready!")
+    print("Model ready!", flush=True)
+
 
 def handler(job):
     try:
-        load_model()
         job_input = job["input"]
         job_type  = job_input.get("type", "generate")
 
@@ -75,5 +81,16 @@ def handler(job):
     except Exception as e:
         import traceback
         return {"error": str(e), "traceback": traceback.format_exc()}
+
+
+# Load model at startup so the first request does not time out waiting for download+load
+print("Initializing handler — loading model at startup...", flush=True)
+try:
+    load_model()
+except Exception as e:
+    import traceback
+    print(f"FATAL: model failed to load: {e}", flush=True)
+    traceback.print_exc()
+    sys.exit(1)
 
 runpod.serverless.start({"handler": handler})

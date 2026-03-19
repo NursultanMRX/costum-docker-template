@@ -7,6 +7,11 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 COPY requirements.txt .
+
+# Install llama-cpp-python with CUDA support first (plain pip gives CPU-only build)
+RUN CMAKE_ARGS="-DGGML_CUDA=on" FORCE_CMAKE=1 pip install --no-cache-dir "llama-cpp-python>=0.3.0"
+
+# Install remaining dependencies (pip will skip llama-cpp-python since it is already satisfied)
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ ./src/
