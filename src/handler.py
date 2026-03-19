@@ -1,19 +1,16 @@
 import runpod
 import os
-import json
-import subprocess
 from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
 
-# ── Global model ──────────────────────────────────────────────
-llm = None
 MODEL_PATH = "/app/models/gemma3-4b-karakalpak-Q4_K_M.gguf"
+llm = None
 
 def load_model():
     global llm
     if llm is not None:
         return
-    
-    # Model yo'q bo'lsa yuklab olish
+
     if not os.path.exists(MODEL_PATH):
         print("⏳ Downloading model...")
         os.makedirs("/app/models", exist_ok=True)
@@ -23,130 +20,60 @@ def load_model():
             local_dir="/app/models",
             token=os.environ["HF_TOKEN"],
         )
-        print("✅ Model downloaded!")
-    
-    from llama_cpp import Llama
-    print("⏳ Loading model into GPU...")
+        print("✅ Downloaded!")
+
+    print("⏳ Loading model...")
     llm = Llama(
         model_path=MODEL_PATH,
         n_gpu_layers=999,
         n_ctx=8192,
         n_batch=512,
-        verbose=False,
+        verbose=True,       # ← True qiling, log ko'rish uchun
         chat_format="gemma",
     )
     print("✅ Model ready!")
 
-# ── Handler ───────────────────────────────────────────────────
 def handler(job):
-    job_input = job["input"]
-    
-    # Model yuklanganligini tekshirish
-    load_model()
-    
-    job_type = job_input.get("type", "generate")
-    
     try:
-        # ── Single generate ───────────────────────────────────
+        load_model()
+        job_input = job["input"]
+        job_type  = job_input.get("type", "generate")
+
         if job_type == "generate":
-            prompt = job_input.get("prompt", "")
-            if not prompt:
-                return {"error": "prompt is required"}
-            
             output = llm(
-                prompt,
-                max_tokens=job_input.get("max_tokens", 1024),
+                job_input.get("prompt", ""),
+                max_tokens=job_input.get("max_tokens", 512),
                 temperature=job_input.get("temperature", 0.7),
-                top_p=job_input.get("top_p", 0.9),
-                top_k=job_input.get("top_k", 50),
-                repeat_penalty=job_input.get("repeat_penalty", 1.1),
-                stop=job_input.get("stop", ["<end_of_turn>", "<eos>"]),
+                stop=["<end_of_turn>", "<eos>"],
             )
-            
             return {
                 "text": output["choices"][0]["text"].strip(),
-                "prompt_tokens": output["usage"]["prompt_tokens"],
-                "completion_tokens": output["usage"]["completion_tokens"],
-                "total_tokens": output["usage"]["total_tokens"],
+                "tokens": output["usage"]["total_tokens"],
             }
-        
-        # ── Batch generate ────────────────────────────────────
-        elif job_type == "batch":
-            prompts = job_input.get("prompts", [])
-            if not prompts:
-                return {"error": "prompts is required"}
-            if len(prompts) > 32:
-                return {"error": "max 32 prompts per batch"}
-            
-            params = {
-                "max_tokens": job_input.get("max_tokens", 1024),
-                "temperature": job_input.get("temperature", 0.7),
-                "top_p": job_input.get("top_p", 0.9),
-                "repeat_penalty": job_input.get("repeat_penalty", 1.1),
-                "stop": job_input.get("stop", ["<end_of_turn>", "<eos>"]),
-            }
-            
-            results = []
-            failed = 0
-            
-            for prompt in prompts:
-                try:
-                    output = llm(prompt, **params)
-                    results.append({
-                        "text": output["choices"][0]["text"].strip(),
-                        "prompt_tokens": output["usage"]["prompt_tokens"],
-                        "completion_tokens": output["usage"]["completion_tokens"],
-                        "total_tokens": output["usage"]["total_tokens"],
-                        "error": None,
-                    })
-                except Exception as e:
-                    failed += 1
-                    results.append({
-                        "text": "",
-                        "prompt_tokens": 0,
-                        "completion_tokens": 0,
-                        "total_tokens": 0,
-                        "error": str(e),
-                    })
-            
-            return {
-                "results": results,
-                "total_prompts": len(prompts),
-                "successful": len(prompts) - failed,
-                "failed": failed,
-            }
-        
-        # ── Chat ──────────────────────────────────────────────
-        elif job_type == "chat":
-            messages = job_input.get("messages", [])
-            if not messages:
-                return {"error": "messages is required"}
-            
-            output = llm.create_chat_completion(
-                messages=messages,
-                max_tokens=job_input.get("max_tokens", 1024),
-                temperature=job_input.get("temperature", 0.7),
-                top_p=job_input.get("top_p", 0.9),
-                repeat_penalty=job_input.get("repeat_penalty", 1.1),
-                stop=job_input.get("stop", ["<end_of_turn>", "<eos>"]),
-            )
-            
-            return {
-                "message": {
-                    "role": "assistant",
-                    "content": output["choices"][0]["message"]["content"].strip(),
-                },
-                "prompt_tokens": output["usage"]["prompt_tokens"],
-                "completion_tokens": output["usage"]["completion_tokens"],
-                "total_tokens": output["usage"]["total_tokens"],
-            }
-        
-        else:
-            return {"error": f"Unknown type: {job_type}. Use: generate, batch, chat"}
-    
-    except Exception as e:
-        return {"error": str(e)}
 
-# ── Start ─────────────────────────────────────────────────────
-if __name__ == "__main__":
-    runpod.serverless.start({"handler": handler})
+        elif job_type == "chat":
+            output = llm.create_chat_completion(
+                messages=job_input.get("messages", []),
+                max_tokens=job_input.get("max_tokens", 512),
+                temperature=job_input.get("temperature", 0.7),
+            )
+            return {
+                "text": output["choices"][0]["message"]["content"].strip(),
+                "tokens": output["usage"]["total_tokens"],
+            }
+
+        elif job_type == "batch":
+            results = []
+            for prompt in job_input.get("prompts", []):
+                out = llm(prompt, max_tokens=job_input.get("max_tokens", 512))
+                results.append(out["choices"][0]["text"].strip())
+            return {"results": results}
+
+        else:
+            return {"error": f"Unknown type: {job_type}"}
+
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc()}
+
+runpod.serverless.start({"handler": handler})
