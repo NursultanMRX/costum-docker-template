@@ -1,7 +1,5 @@
 import runpod
 import os
-import sys
-from huggingface_hub import hf_hub_download
 from llama_cpp import Llama
 
 MODEL_PATH = "/app/models/gemma3-4b-karakalpak-Q4_K_M.gguf"
@@ -14,20 +12,12 @@ def load_model():
         return
 
     if not os.path.exists(MODEL_PATH):
-        print("Downloading model from HuggingFace...", flush=True)
-        os.makedirs("/app/models", exist_ok=True)
-        hf_token = os.environ.get("HF_TOKEN")
-        if not hf_token:
-            print("WARNING: HF_TOKEN not set. Download may fail for private repos.", flush=True)
-        hf_hub_download(
-            repo_id="nickoo004/gemma3-4b-karakalpak-GGUF",
-            filename="gemma3-4b-karakalpak-Q4_K_M.gguf",
-            local_dir="/app/models",
-            token=hf_token,
+        raise FileNotFoundError(
+            f"Model not found at {MODEL_PATH}. "
+            "The model must be baked into the Docker image at build time."
         )
-        print("Model downloaded!", flush=True)
 
-    print("Loading model into GPU...", flush=True)
+    print(f"Loading model from {MODEL_PATH} ...", flush=True)
     llm = Llama(
         model_path=MODEL_PATH,
         n_gpu_layers=999,
@@ -35,7 +25,10 @@ def load_model():
         n_batch=512,
         n_threads=4,
         verbose=True,
-        chat_format="gemma3",
+        # chat_format=None: auto-detect from the GGUF embedded chat template.
+        # This is the most correct approach for Gemma 3 and avoids hard-coding
+        # a format name that may not exist in the installed llama-cpp-python version.
+        chat_format=None,
     )
     print("Model ready!", flush=True)
 
@@ -83,14 +76,10 @@ def handler(job):
         return {"error": str(e), "traceback": traceback.format_exc()}
 
 
-# Load model at startup so the first request does not time out waiting for download+load
-print("Initializing handler — loading model at startup...", flush=True)
-try:
-    load_model()
-except Exception as e:
-    import traceback
-    print(f"FATAL: model failed to load: {e}", flush=True)
-    traceback.print_exc()
-    sys.exit(1)
+# Load model into VRAM at container startup.
+# Because the model is baked into the image this is fast (~seconds to load
+# into GPU, no download). The worker only calls runpod.serverless.start()
+# after the model is loaded, so RunPod never routes a job to an unready worker.
+load_model()
 
 runpod.serverless.start({"handler": handler})
