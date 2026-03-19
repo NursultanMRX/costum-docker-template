@@ -27,7 +27,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # ← BU STEP QOSHILDI — asosiy fix!
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -50,3 +49,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Pass HF_TOKEN as a BuildKit secret so it is NEVER stored in any
+          # image layer. Add HF_TOKEN to your repo's Settings > Secrets.
+          secrets: |
+            HF_TOKEN=${{ secrets.HF_TOKEN }}
