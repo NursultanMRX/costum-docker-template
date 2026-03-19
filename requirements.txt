@@ -1,1 +1,8 @@
-
+modal>=0.64.0
+vllm==0.4.3
+huggingface_hub
+hf_transfer
+fastapi
+pydantic>=2.0
+pydantic-settings
+uvicorn
