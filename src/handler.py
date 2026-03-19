@@ -25,19 +25,7 @@ def load_model():
         )
         print("✅ Model downloaded!")
     
-    # llama-cpp-python ni runtime da yuklaymiz
-    try:
-        from llama_cpp import Llama
-    except ImportError:
-        print("⏳ Installing llama-cpp-python with CUDA...")
-        subprocess.run([
-            "pip", "install", "--no-cache-dir",
-            "llama-cpp-python",
-            "--extra-index-url",
-            "https://abetlen.github.io/llama-cpp-python/whl/cu121"
-        ], check=True)
-        from llama_cpp import Llama
-    
+    from llama_cpp import Llama
     print("⏳ Loading model into GPU...")
     llm = Llama(
         model_path=MODEL_PATH,
