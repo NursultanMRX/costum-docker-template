@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     cmake \
     build-essential \
-    ninja-build \          # ← BU QOSHILDI — asosiy fix!
+    ninja-build \
     && rm -rf /var/lib/apt/lists/*
 
 RUN ln -s /usr/bin/python3.11 /usr/bin/python
@@ -18,7 +18,6 @@ RUN pip install --upgrade pip setuptools wheel
 
 WORKDIR /app
 
-# llama-cpp-python CUDA bilan
 ENV CMAKE_ARGS="-DGGML_CUDA=on"
 ENV FORCE_CMAKE=1
 
